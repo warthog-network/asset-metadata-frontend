@@ -1,9 +1,10 @@
 // Browser-side UI for the Warthog node picker.
 // The input is authoritative — user can type any URL.
 // The "Choose" button opens a popover listing nodes fetched from
-// data.warthog.network (with hardcoded fallback) and probed via
-// /api/node-health. Picking a node fills the input and stores in
-// localStorage so future loads remember the choice.
+// data.warthog.network (with hardcoded fallback). Picking a node fills the
+// input and stores it in localStorage so future loads remember the choice.
+// Health badges come from /api/node-health when something serves it; on a
+// static host nothing does, and the list renders without them.
 
 import {
   loadNodes,
@@ -26,9 +27,8 @@ function init() {
   let popoverOpen = false;
 
   async function openPopover() {
-    // Load node list (cached) + fetch fresh health each open. The
-    // /api/node-health endpoint is server-cached for 30s so this is
-    // cheap even on rapid open/close.
+    // Load node list (cached) + attempt fresh health each open. Health is
+    // client-cached for 30s, so rapid open/close is cheap either way.
     await loadNodes();
     const entries = await getNodesWithHealth();
     renderNodeListItems(list, entries);

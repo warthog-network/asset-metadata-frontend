@@ -1,0 +1,31 @@
+# Netlify build for the Warthog Asset Metadata frontend.
+#
+# This deploys the FRONTEND ONLY. Submissions, the wallet challenge, and
+# the asset catalog are all served by the Phoenix backend on the VPS —
+# set API_BASE_URL below to that origin.
+
+[build]
+  command = "npm run build:netlify"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  API_BASE_URL = "https://warthog-defitestnet.duckdns.org:4445"
+
+# Single page, no client-side router — nothing to rewrite. Static assets
+# are content-addressed by the build, so cache them hard and keep the
+# HTML itself always-revalidated.
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

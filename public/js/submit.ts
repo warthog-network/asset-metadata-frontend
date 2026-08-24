@@ -10,6 +10,12 @@
 //
 // Also wires up client-side image validation + resize on file inputs
 // marked with `data-validate-dimensions="W,H"` inside `[data-file-field]`.
+//
+// Submissions carry a wallet proof: the backend only accepts metadata
+// signed by the asset's on-chain creator, so the submit handler fetches a
+// challenge and attaches wallet_nonce + wallet_signature before POSTing.
+
+import { attachWalletProof, currentAccount, initWalletLogin } from "./wallet.js";
 
 function showError(message) {
   const banner = document.getElementById("submit-error");
@@ -36,9 +42,9 @@ function showSuccess(payload, form) {
   if (!panel) return;
 
   setText("success-asset-hash", payload.assetHash || "");
-  setText("success-pr-url", payload.prUrl || "");
-  const link = document.getElementById("success-pr-link");
-  if (link) link.href = payload.prUrl || "#";
+  setText("success-info-url", payload.infoUrl || "");
+  const link = document.getElementById("success-info-link");
+  if (link) link.href = payload.infoUrl || "#";
 
   panel.classList.remove("hidden");
   if (form) form.classList.add("hidden");
@@ -105,49 +111,61 @@ function clearPreview(imgEl, infoEl, statusEl) {
   statusEl.className = "text-slate-500";
 }
 
-// Resize an image to fit within (maxW × maxH), preserving aspect. Output
-// is always PNG. Returns the original File if no resize was needed, or a
-// new File at exact (maxW × maxH) PNG (with transparent padding).
-async function resizeImageIfTooLarge(file, maxW, maxH) {
-  const dims = await readDimensions(file);
-
-  // Only resize if source exceeds the target in BOTH dimensions.
-  if (dims.width <= maxW || dims.height <= maxH) {
-    return { file, didResize: false, didPad: false, originalDims: dims };
-  }
-
+// Re-encode any canvas-decodable image to a PNG of EXACTLY (targetW ×
+// targetH). The server accepts only those exact dimensions and does no
+// resizing of its own, so this is what makes ordinary uploads work.
+//
+// The source is scaled to fit while preserving aspect ratio, then centered
+// on a transparent canvas of the target size. Smaller sources are scaled
+// up: the server would otherwise reject them outright, and an upscaled
+// logo beats no logo. Callers warn about the quality loss.
+//
+// Throws if the browser cannot decode the source (e.g. HEIC in Chrome),
+// which the caller treats as "leave the original alone".
+async function reencodeToPng(file, targetW, targetH) {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise((resolve, reject) => {
       const i = new Image();
       i.onload = () => resolve(i);
-      i.onerror = () => reject(new Error("decode failed"));
+      i.onerror = () => reject(new Error("could not decode image"));
       i.src = url;
     });
 
-    const ratio = Math.min(maxW / dims.width, maxH / dims.height);
-    const innerW = Math.round(dims.width * ratio);
-    const innerH = Math.round(dims.height * ratio);
-    const offsetX = Math.round((maxW - innerW) / 2);
-    const offsetY = Math.round((maxH - innerH) / 2);
-    const didPad = innerW !== maxW || innerH !== maxH;
+    const srcW = img.naturalWidth;
+    const srcH = img.naturalHeight;
+    if (!srcW || !srcH) throw new Error("image has no dimensions");
+
+    const ratio = Math.min(targetW / srcW, targetH / srcH);
+    const innerW = Math.max(1, Math.round(srcW * ratio));
+    const innerH = Math.max(1, Math.round(srcH * ratio));
 
     const canvas = document.createElement("canvas");
-    canvas.width = maxW;
-    canvas.height = maxH;
+    canvas.width = targetW;
+    canvas.height = targetH;
     const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, maxW, maxH);
-    ctx.drawImage(img, offsetX, offsetY, innerW, innerH);
+    if (!ctx) throw new Error("canvas 2d context unavailable");
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(
+      img,
+      Math.round((targetW - innerW) / 2),
+      Math.round((targetH - innerH) / 2),
+      innerW,
+      innerH,
+    );
 
     const blob = await new Promise((resolve, reject) => {
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/png");
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error("canvas.toBlob returned null"))),
+        "image/png",
+      );
     });
 
+    const name = file.name.replace(/\.[^.]+$/, "") + ".png";
     return {
-      file: new File([blob], file.name.replace(/\.[^.]+$/, "") + ".png", { type: "image/png" }),
-      didResize: true,
-      didPad,
-      originalDims: dims,
+      file: new File([blob], name, { type: "image/png" }),
+      didReencode: true,
+      originalType: file.type,
     };
   } finally {
     URL.revokeObjectURL(url);
@@ -233,10 +251,11 @@ function initFileField(container, onChange) {
         // for canvas) and resizes oversized PNGs in one pass. Without this,
         // iPhone HEIC photos hit the server unchanged and get rejected as
         // "not a PNG or JPEG".
+        const currentDims = await quickDims(original);
         const needsReencode =
           original.type !== "image/png" ||
-          (await quickDims(original)).width !== expectedW ||
-          (await quickDims(original)).height !== expectedH;
+          currentDims.width !== expectedW ||
+          currentDims.height !== expectedH;
 
         if (needsReencode) {
           let result: { file: File; didReencode: boolean; originalType: string } | null = null;
@@ -294,7 +313,9 @@ function initForm(form) {
   const recomputeSubmit = () => {
     if (!submitBtn) return;
     const allValid = Array.from(fileStates.values()).every(Boolean);
-    submitBtn.disabled = !allValid;
+    // The server rejects unsigned submissions (401 challenge_required), so
+    // the button stays disabled until a wallet is unlocked.
+    submitBtn.disabled = !(allValid && currentAccount());
   };
 
   fileStates.clear();
@@ -314,15 +335,22 @@ function initForm(form) {
     });
   });
 
+  form.addEventListener("wallet-change", recomputeSubmit);
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     hideError();
     setSubmitting(form, true);
 
     try {
+      const data = new FormData(form);
+      // Fetches a one-time challenge and signs it in-page. The private key
+      // never leaves the browser — only the nonce + signature are sent.
+      await attachWalletProof(data, data.get("asset_hash"));
+
       const response = await fetch(form.action, {
         method: form.method,
-        body: new FormData(form),
+        body: data,
       });
 
       let body = null;
@@ -346,7 +374,22 @@ function initForm(form) {
   });
 }
 
+// The website links here with ?asset_hash=<hash> (or ?hash=), so prefill
+// the field and let autocomplete.js fire its ticker lookup.
+function prefillAssetHash() {
+  const params = new URLSearchParams(window.location.search);
+  const raw = (params.get("asset_hash") || params.get("hash") || "").trim();
+  const hash = raw.replace(/^0x/i, "").toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(hash)) return;
+  const input = document.querySelector('#submit-form input[name="asset_hash"]');
+  if (!input) return;
+  input.value = hash;
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
 function initAll() {
+  initWalletLogin();
+  prefillAssetHash();
   document.querySelectorAll("[data-submit-form]").forEach(initForm);
 
   const reset = document.getElementById("success-submit-another");

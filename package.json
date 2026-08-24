@@ -1,21 +1,22 @@
 {
   "name": "asset-metadata-js",
   "version": "0.1.0",
-  "description": "Warthog Asset Metadata — Bun/TypeScript port",
+  "description": "Warthog Asset Metadata — static frontend",
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun --watch src/server.ts & esbuild --bundle public/js/app.js --outfile=public/assets/app.js --watch --external:/fonts/* --external:/images/* & tailwindcss -i ./public/css/app.css -o ./public/assets/app.css --watch",
+    "dev": "node scripts/dev.mjs",
+    "build": "npm run build:netlify",
     "build:css": "tailwindcss -i ./public/css/app.css -o ./public/assets/app.css --minify",
     "build:js": "esbuild --bundle public/js/app.js --minify --outfile=public/assets/app.js --external:/fonts/* --external:/images/*",
-    "build": "bun run build:css && bun run build:js",
-    "start": "bun src/server.ts",
-    "test": "bun test",
-    "precommit": "bun run test"
+    "build:static": "esbuild scripts/build-static.ts --bundle --platform=node --format=esm --outfile=.build/build-static.mjs && node .build/build-static.mjs",
+    "build:netlify": "npm run build:css && npm run build:js && npm run build:static"
   },
   "devDependencies": {
-    "@types/bun": "^1.1.0",
+    "@types/node": "^26.3.0",
+    "crypto-js": "^4.2.0",
     "esbuild": "^0.20.0",
+    "ethers": "^6.17.0",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.4.0"
   }

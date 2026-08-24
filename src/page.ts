@@ -1,7 +1,9 @@
-// GET /  →  serve the Warthog-branded form page. The apiUrl is computed
-// from the request so the form's action attribute is always correct
-// regardless of how the service is exposed (localhost, reverse proxy,
-// different scheme).
+// The Warthog-branded submission form, rendered to a single static page.
+//
+// `apiUrl` is the absolute URL of the backend's POST endpoint, baked into
+// the form's action at build time (see scripts/build-static.ts). The page
+// is served as static files, so it cannot derive the URL at request time —
+// and the API lives on a different origin anyway.
 
 export function renderHome(apiUrl: string): string {
   return `<!DOCTYPE html>
@@ -71,6 +73,70 @@ export function renderHome(apiUrl: string): string {
             class="absolute left-0 right-0 z-20 mt-1 hidden max-h-72 overflow-auto rounded-lg border border-white/10 bg-[rgba(8,12,24,0.98)] py-1 shadow-[0_15px_30px_rgba(2,6,14,0.65)] backdrop-blur"
           ></ul>
           <p class="mt-1 text-xs text-slate-500">Used only for client-side autocomplete and ticker lookup.</p>
+        </div>
+      </div>
+
+      <div id="wallet-panel" data-wallet-login class="mt-5 rounded-lg border border-white/10 bg-black/30 p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="m-0 font-montserrat text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-slate-400">Warthog wallet</p>
+            <p id="wallet-status" class="mt-1 text-sm text-slate-300">
+              Unlock the same way as WartBunker — saved wallet, file, seed, or private key.
+            </p>
+            <p id="wallet-address" class="mt-1 hidden break-all font-mono text-xs text-emerald-200"></p>
+          </div>
+          <button id="wallet-lock" type="button" class="hidden shrink-0 rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-slate-200 hover:bg-white/5">
+            Lock
+          </button>
+        </div>
+
+        <div id="wallet-unlock" class="mt-4 flex flex-col gap-3">
+          <div class="flex flex-wrap gap-2">
+            <button type="button" data-wallet-tab="saved" class="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-slate-200 hover:bg-white/5">Saved wallet</button>
+            <button type="button" data-wallet-tab="file" class="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-slate-200 hover:bg-white/5">Wallet file</button>
+            <button type="button" data-wallet-tab="seed" class="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-slate-200 hover:bg-white/5">Seed phrase</button>
+            <button type="button" data-wallet-tab="key" class="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-slate-200 hover:bg-white/5">Private key</button>
+          </div>
+
+          <div data-wallet-pane="saved">
+            <p class="m-0 text-xs text-slate-400">
+              Named wallets stored in this browser (<code class="font-mono">warthogWallet_*</code>). WartBunker saves on its own origin — use a wallet file if you unlocked there.
+            </p>
+            <label for="wallet-saved" class="mt-2 block text-sm font-medium text-slate-200">Wallet</label>
+            <select id="wallet-saved" class="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-100 outline-none focus:border-[#FDB913]"></select>
+            <label for="wallet-saved-password" class="mt-2 block text-sm font-medium text-slate-200">Password</label>
+            <input id="wallet-saved-password" type="password" autocomplete="current-password" class="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-100 outline-none focus:border-[#FDB913]" />
+          </div>
+
+          <div data-wallet-pane="file" class="hidden">
+            <p class="m-0 text-xs text-slate-400">
+              Same encrypted <code class="font-mono">warthog_wallet.txt</code> WartBunker downloads.
+            </p>
+            <label for="wallet-file" class="mt-2 block text-sm font-medium text-slate-200">Wallet file</label>
+            <input id="wallet-file" type="file" accept=".txt,.json,text/plain,application/json" class="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-100 file:mr-3 file:rounded file:border-0 file:bg-[#FDB913] file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-900" />
+            <label for="wallet-file-password" class="mt-2 block text-sm font-medium text-slate-200">Password</label>
+            <input id="wallet-file-password" type="password" autocomplete="current-password" class="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-100 outline-none focus:border-[#FDB913]" />
+          </div>
+
+          <div data-wallet-pane="seed" class="hidden">
+            <label for="wallet-seed" class="text-sm font-medium text-slate-200">Seed phrase</label>
+            <textarea id="wallet-seed" rows="2" autocomplete="off" spellcheck="false" placeholder="12 or 24 words" class="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-sm text-slate-100 outline-none focus:border-[#FDB913]"></textarea>
+            <label for="wallet-path" class="mt-2 block text-sm font-medium text-slate-200">Derivation path</label>
+            <select id="wallet-path" class="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-100 outline-none focus:border-[#FDB913]">
+              <option value="m/44'/2070'/0'/0/0">Hardened m/44'/2070'/0'/0/0 (WartBunker default)</option>
+              <option value="m/44'/2070'/0/0/0">Standard m/44'/2070'/0/0/0</option>
+            </select>
+          </div>
+
+          <div data-wallet-pane="key" class="hidden">
+            <label for="wallet-key" class="text-sm font-medium text-slate-200">Private key</label>
+            <input id="wallet-key" type="password" autocomplete="off" spellcheck="false" placeholder="64 hex characters" class="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-sm text-slate-100 outline-none focus:border-[#FDB913]" />
+          </div>
+
+          <p id="wallet-error" class="hidden text-sm text-rose-300"></p>
+          <button id="wallet-unlock-btn" type="button" class="inline-flex w-fit items-center rounded-full bg-gradient-to-br from-[#FDB913] to-[#E79300] px-5 py-2 text-sm font-semibold text-slate-900">
+            Unlock wallet
+          </button>
         </div>
       </div>
 
@@ -201,19 +267,18 @@ export function renderHome(apiUrl: string): string {
           <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><polyline points="20 6 9 17 4 12"></polyline></svg>
           </span>
-          <h2 class="m-0 font-montserrat text-lg font-semibold text-emerald-100">Pull request opened</h2>
+          <h2 class="m-0 font-montserrat text-lg font-semibold text-emerald-100">Metadata published</h2>
         </div>
         <p class="mt-3 text-sm text-emerald-100/80">
-          Your metadata has been submitted as a pull request against
-          <code class="font-mono text-[0.92em] text-emerald-100">warthog-network/public-data</code>.
-          A maintainer will review and merge.
+          Your metadata is live in the asset catalog and served from this host.
+          It is available immediately at the info URL below.
         </p>
         <dl class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-[8rem_1fr]">
           <dt class="text-xs font-semibold uppercase tracking-wider text-emerald-200/70">Asset hash</dt>
           <dd id="success-asset-hash" class="m-0 break-all font-mono text-sm text-emerald-50"></dd>
-          <dt class="text-xs font-semibold uppercase tracking-wider text-emerald-200/70">Pull request</dt>
+          <dt class="text-xs font-semibold uppercase tracking-wider text-emerald-200/70">Info URL</dt>
           <dd class="m-0 break-all font-mono text-sm">
-            <a id="success-pr-link" href="#" target="_blank" rel="noreferrer noopener" class="text-emerald-200 underline decoration-emerald-500/40 underline-offset-2 hover:text-emerald-100"><span id="success-pr-url"></span></a>
+            <a id="success-info-link" href="#" target="_blank" rel="noreferrer noopener" class="text-emerald-200 underline decoration-emerald-500/40 underline-offset-2 hover:text-emerald-100"><span id="success-info-url"></span></a>
           </dd>
         </dl>
         <button id="success-submit-another" type="button"
@@ -235,13 +300,4 @@ export function renderHome(apiUrl: string): string {
   </script>
 </body>
 </html>`;
-}
-
-export function handleHome(req: Request): Response {
-  const url = new URL(req.url);
-  const scheme = url.protocol.replace(":", "");
-  const apiUrl = `${scheme}://${url.host}/api/submit`;
-  return new Response(renderHome(apiUrl), {
-    headers: { "Content-Type": "text/html; charset=utf-8" },
-  });
 }

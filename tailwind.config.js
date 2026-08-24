@@ -4,6 +4,9 @@ module.exports = {
     "./src/**/*.{ts,html}",
     "./public/index.html",
     "./public/**/*.html",
+    // wallet.js builds its active/inactive tab class strings at runtime,
+    // so the scripts have to be scanned too or those classes get purged.
+    "./public/js/**/*.{js,ts}",
   ],
   theme: {
     extend: {

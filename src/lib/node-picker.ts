@@ -1,6 +1,6 @@
 // Browser-side testnet node helper:
 //   - Fetch the DeFi node list from data.warthog.network (with hardcoded fallback)
-//   - Fetch per-node health (alive/version) from the asset-metadata-js /api/node-health
+//   - Fetch per-node health (alive/version) from /api/node-health
 //   - Cache both in sessionStorage with TTL
 //   - Persist the user's chosen URL in localStorage
 //   - Provide a render helper for the dropdown popover
@@ -57,6 +57,11 @@ function saveNodesCache(entries: NodeEntry[]): void {
 }
 
 export async function loadNodes(force = false): Promise<NodeEntry[]> {
+  // nodesCache is per-page-load; rehydrate it from sessionStorage so the
+  // TTL below actually spans navigations. Without this the persisted entry
+  // is written by saveNodesCache and never read back.
+  if (!force && !nodesCache) nodesCache = loadNodesCache();
+
   if (!force && nodesCache && Date.now() - nodesCache.ts < NODES_CACHE_TTL_MS) {
     return nodesCache.entries;
   }
@@ -110,6 +115,11 @@ export async function getNodesWithHealth(forceHealth = false): Promise<NodeWithH
     healthMap = healthCache.byUrl;
   } else {
     try {
+      // Best-effort: this repo is frontend-only and serves no API, so on a
+      // static host there is nothing behind this path and the request 404s.
+      // That is handled — `res.ok` is false, healthMap stays null, and the
+      // picker renders its node list without alive/version badges. Add a
+      // Netlify function (or a backend route) at this path to light them up.
       const res = await fetch("/api/node-health");
       if (res.ok) {
         const body = (await res.json()) as { nodes?: unknown };
