@@ -17,8 +17,12 @@ import { renderHome } from "../src/page";
 
 // Where the Phoenix backend lives. Override per-deploy with the
 // API_BASE_URL build environment variable in Netlify.
+// `??`, not `||`: an empty API_BASE_URL is a deliberate setting meaning
+// "same origin" — the Netlify proxy fronts the backend, so the page emits
+// relative URLs. `||` would treat "" as unset and fall back to the absolute
+// :4445 URL, silently reintroducing the cross-origin request.
 const API_BASE_URL =
-  process.env.API_BASE_URL || "https://warthog-defitestnet.duckdns.org:4445";
+  process.env.API_BASE_URL ?? "https://warthog-defitestnet.duckdns.org:4445";
 
 const OUT = "dist";
 

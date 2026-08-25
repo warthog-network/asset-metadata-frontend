@@ -1,8 +1,8 @@
 # Netlify build for the Warthog Asset Metadata frontend.
 #
 # This deploys the FRONTEND ONLY. Submissions, the wallet challenge, and
-# the asset catalog are all served by the Phoenix backend on the VPS —
-# set API_BASE_URL below to that origin.
+# the asset catalog are all served by the Phoenix backend on the VPS, which
+# the redirects below proxy so it appears same-origin under this domain.
 
 [build]
   command = "npm run build:netlify"
@@ -10,11 +10,44 @@
 
 [build.environment]
   NODE_VERSION = "22"
-  API_BASE_URL = "https://warthog-defitestnet.duckdns.org:4445"
+  # Empty = same origin. The redirects below proxy /api/* and the asset
+  # catalog to the Phoenix backend, so the page emits relative URLs and the
+  # browser never makes a cross-origin request. Set this to an absolute
+  # origin only if you deploy the frontend without the proxy.
+  API_BASE_URL = ""
 
-# Single page, no client-side router — nothing to rewrite. Static assets
-# are content-addressed by the build, so cache them hard and keep the
-# HTML itself always-revalidated.
+# Proxy the Phoenix backend so the API is same-origin with the form.
+# status = 200 is a rewrite: the URL stays on this domain and Netlify
+# fetches from the VPS. Target is port 443, not :4445 — Netlify's proxy is
+# only dependable against standard ports, and nginx routes these paths to
+# the Phoenix service on the VPS.
+[[redirects]]
+  from = "/api/submit"
+  to = "https://warthog-defitestnet.duckdns.org/api/submit"
+  status = 200
+
+[[redirects]]
+  from = "/api/complete"
+  to = "https://warthog-defitestnet.duckdns.org/api/complete"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/challenge"
+  to = "https://warthog-defitestnet.duckdns.org/api/auth/challenge"
+  status = 200
+
+[[redirects]]
+  from = "/assets.json"
+  to = "https://warthog-defitestnet.duckdns.org/assets.json"
+  status = 200
+
+[[redirects]]
+  from = "/assets/*"
+  to = "https://warthog-defitestnet.duckdns.org/assets/:splat"
+  status = 200
+
+# Static assets are content-addressed by the build, so cache them hard and
+# keep the HTML itself always-revalidated.
 [[headers]]
   for = "/js/*"
   [headers.values]
