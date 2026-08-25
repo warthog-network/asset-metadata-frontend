@@ -4,8 +4,9 @@
 //   - event.preventDefault() so the browser doesn't navigate
 //   - POST FormData to form.action via fetch()
 //   - Read JSON response
-//   - On success (body.ok === true): hide form, show success panel
-//   - On error (body.ok === false): show error banner at top, leave the
+//   - On success (body.ok === true): hide form, show success panel from body.data
+//   - On error (body.ok === false): show body.error.message in a banner at the
+//     top, leave the
 //     form visible
 //
 // Also wires up client-side image validation + resize on file inputs
@@ -35,6 +36,13 @@ function hideError() {
 function setText(id, text) {
   const el = document.getElementById(id);
   if (el) el.textContent = text;
+}
+
+// The API answers {ok, data} / {ok, error:{code,message}} — see the backend's
+// AssetMetadataServiceWeb.Envelope. Payload fields live under `data`, and an
+// error carries a machine-readable `code` alongside the human `message`.
+function apiErrorMessage(body, status) {
+  return body?.error?.message || `Server error (HTTP ${status}).`;
 }
 
 function showSuccess(payload, form) {
@@ -362,9 +370,9 @@ function initForm(form) {
       }
 
       if (body && body.ok) {
-        showSuccess(body, form);
+        showSuccess(body.data || {}, form);
       } else {
-        showError((body && body.error) || `Server error (HTTP ${response.status}).`);
+        showError(apiErrorMessage(body, response.status));
       }
     } catch (err) {
       showError("Network error: " + err.message);

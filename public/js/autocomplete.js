@@ -47,6 +47,10 @@ function hide(list) {
   list.replaceChildren();
 }
 
+// Reads body.data.matches. That is the Warthog node's own {code, data} shape,
+// and since the metadata service's /api/complete was normalized to
+// {ok, data:{matches}} the two are now drop-in interchangeable — pointing
+// baseUrl at either one works without touching this function.
 async function fetchComplete(baseUrl, prefix, signal) {
   const url =
     baseUrl.replace(/\/$/, "") +

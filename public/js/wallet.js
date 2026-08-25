@@ -327,8 +327,12 @@ export async function attachWalletProof(formData, assetHash) {
     apiBase() + "/auth/challenge?asset_hash=" + encodeURIComponent(assetHash.toLowerCase()),
   );
   const body = await res.json().catch(() => null);
-  if (!body || !body.ok || !body.message || !body.nonce) {
-    throw new Error((body && body.error) || "could not get wallet challenge");
+  // {ok: true, data: {message, nonce, expiresIn}} on success,
+  // {ok: false, error: {code, message}} on failure — see the backend's
+  // AssetMetadataServiceWeb.Envelope.
+  const challenge = body?.data;
+  if (!body || !body.ok || !challenge?.message || !challenge?.nonce) {
+    throw new Error(body?.error?.message || "could not get wallet challenge");
   }
 
   let signature;
@@ -336,8 +340,8 @@ export async function attachWalletProof(formData, assetHash) {
     const signed = await requestOpener(
       {
         type: "wart-metadata-sign",
-        id: body.nonce,
-        message: body.message,
+        id: challenge.nonce,
+        message: challenge.message,
       },
       "wart-metadata-signed",
       20000,
@@ -347,10 +351,10 @@ export async function attachWalletProof(formData, assetHash) {
     }
     signature = signed.signature;
   } else {
-    signature = signMessage(session, body.message);
+    signature = signMessage(session, challenge.message);
   }
 
-  formData.set("wallet_nonce", body.nonce);
+  formData.set("wallet_nonce", challenge.nonce);
   formData.set("wallet_signature", signature);
   return session.address;
 }

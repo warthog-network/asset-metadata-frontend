@@ -150,6 +150,25 @@ Only the asset's on-chain creator can publish its metadata — anyone else gets
 
 Owned by the Phoenix service, documented here because the form depends on it.
 
+**Two surfaces, two conventions.** Everything under `/api/*` is enveloped:
+
+```
+{"ok": true,  "data":  {...}}
+{"ok": false, "error": {"code": "...", "message": "..."}}
+```
+
+The public catalog is not. `/assets.json` and `/assets/<hash>/info.json` return
+the resource itself, because they are file-shaped URLs whose siblings
+(`logo.png`, `banner.png`) are binary and could never carry an envelope. Only
+their *error* bodies use the enveloped form, so a failure looks the same
+everywhere.
+
+The HTTP status is authoritative in both cases — the envelope repeats it, it
+does not replace it. This differs from the Warthog node, which answers errors
+with `200` and a numeric `code`. nginx, Netlify's edge and Cloudflare all cache
+on status here, and the catalog is served `max-age=300`, so an error returned
+as `200` would be cached as a success.
+
 ### `POST /api/submit`
 
 `multipart/form-data`, always returns JSON.
@@ -176,23 +195,41 @@ Success (201):
 ```json
 {
   "ok": true,
-  "assetHash": "c2aa…d297",
-  "infoUrl": "https://warthog-defitestnet.duckdns.org:4445/assets/c2aa…d297/info.json"
+  "data": {
+    "assetHash": "c2aa…d297",
+    "infoUrl": "https://warthog-defitestnet.duckdns.org/assets/c2aa…d297/info.json",
+    "logoUrl": "…",
+    "bannerUrl": "…"
+  }
 }
 ```
 
 Error (4xx/5xx):
 
 ```json
-{ "ok": false, "error": "logo: must be exactly 250x250 px, got 300x300 px" }
+{
+  "ok": false,
+  "error": {
+    "code": "wrong_dimensions",
+    "message": "logo: must be exactly 250x250 px, got 300x300 px"
+  }
+}
 ```
+
+`code` is stable and safe to branch on; `message` is human-facing and may be
+reworded. Known codes: `invalid_hash`, `invalid_name`, `invalid_description`,
+`invalid_url`, `invalid_image`, `wrong_dimensions`, `logo_required`,
+`asset_not_found`, `not_owner`, `bad_signature`, `challenge_required`,
+`challenge_expired`, `node_unreachable`, `node_error`, `catalog_error`,
+`missing_param`, `not_found`, `unprocessable`.
 
 The server re-validates everything the browser checked — never trust the client.
 
 ### `GET /api/auth/challenge?asset_hash=<hash>`
 
-Returns `{ ok, message, nonce, expiresIn }`. The message is bound to the host
-and the asset, so a signature cannot be replayed against another token.
+Returns `{ ok: true, data: { message, nonce, expiresIn } }`. The message is
+bound to the host and the asset, so a signature cannot be replayed against
+another token.
 
 ### `GET /assets.json`, `GET /assets/<hash>/{info.json,logo.png,banner.png}`
 
