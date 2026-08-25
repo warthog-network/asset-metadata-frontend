@@ -10,18 +10,22 @@ submission, the wallet challenge, and the published asset catalog. This repo
 builds to static files and deploys to Netlify.
 
 ```
-browser (Netlify)                          VPS (Phoenix + Postgres)
-  index.html + app.js  ──── POST /api/submit ─────────►  publish to catalog
-                       ──── GET  /api/auth/challenge ─►  one-time nonce
-  /assets.json         ──── proxied by Netlify ───────►  the public catalog
-  /assets/<hash>/...   ──── proxied by Netlify ───────►  serve metadata
-  autocomplete         ──── GET  /asset/complete ─────►  Warthog node (direct)
+browser                     Netlify edge              VPS (Phoenix + Postgres)
+  index.html + app.js
+  POST /api/submit      ──── rewrite ────────────────►  publish to catalog
+  GET  /api/auth/challenge ─ rewrite ────────────────►  one-time nonce
+  GET  /assets.json     ──── rewrite ────────────────►  the public catalog
+  GET  /assets/<hash>/… ──── rewrite ────────────────►  serve metadata
+  autocomplete ─────────────────────────────────────►  Warthog node (direct)
+
+assets.warthog.network
+  GET  /<hash>/…        ──── rewrite ────────────────►  /assets/<hash>/…
 ```
 
-The API calls go straight to the VPS cross-origin. The catalog is the
-exception: wallets and explorers expect it on an origin of their own, so
-`dist/_redirects` rewrites it through to the backend — both on this site and on
-`assets.warthog.network`, where the hash sits at the root (see **Deploy**).
+Nothing the browser calls is cross-origin in production: Netlify rewrites
+`/api/*` and the catalog through to the VPS, so the page emits relative URLs
+(see **Deploy**). The catalog additionally answers on `assets.warthog.network`,
+where the asset hash sits at the root instead of under `/assets/`.
 
 ## Quick start
 
@@ -38,10 +42,12 @@ Node only — no Bun required. Rebuilds on save:
 | `public/css/app.css` | Tailwind |
 | `src/page.ts` | `index.html` |
 
-The API is **not** proxied. The form posts to `API_BASE_URL` (the VPS) exactly
-as in production, so wallet unlock and submission are testable end to end from
-localhost. The backend returns CORS headers for the requesting origin, so
-`http://localhost:4000` works with no configuration.
+The dev server applies no rewrites. `API_BASE_URL` is unset here, so it keeps
+its absolute default and the form posts straight to the VPS — wallet unlock and
+submission are testable end to end from localhost. The backend returns CORS
+headers for the requesting origin, so `http://localhost:4000` works with no
+configuration. Production differs: there the same calls are same-origin,
+rewritten by Netlify.
 
 Point it elsewhere with `API_BASE_URL=http://localhost:4010 npm run dev`.
 
@@ -59,55 +65,62 @@ which renders `src/page.ts` once and writes `dist/`.
 Because the page is rendered at build time it cannot derive the API URL from
 the request host, so the URL is baked into the form's `action`:
 
-| Build env var | Default |
-|---|---|
-| `API_BASE_URL` | `https://warthog-defitestnet.duckdns.org:4445` |
-| `CATALOG_BASE_URL` | falls back to `API_BASE_URL` |
-| `CATALOG_HOST` | unset (no host-scoped rules) |
-
-### The catalog proxy
-
-A static host has no `/assets.json` to serve, so the path 404s on its own. The
-build writes `dist/_redirects` with `200!` rewrites — a rewrite, not a
-redirect, so the URL stays on the requested origin and the backend's CORS and
-cache headers pass through untouched.
-
-Two path shapes are served:
-
-| Where | Path | Proxied to |
+| Build env var | Default | Purpose |
 |---|---|---|
-| every domain | `/assets.json` | `<CATALOG_BASE_URL>/assets.json` |
-| every domain | `/assets/<hash>/<file>` | the same path upstream |
-| `CATALOG_HOST` only | `/<hash>/<file>` | `/assets/<hash>/<file>` upstream |
-| `CATALOG_HOST` only | `/` | `/assets.json` — a data host answers with the catalog, not the form |
+| `API_BASE_URL` | `https://warthog-defitestnet.duckdns.org:4445` | baked into the form `action`; `""` on Netlify means same-origin |
+| `CATALOG_BASE_URL` | `https://warthog-defitestnet.duckdns.org` | origin the catalog is proxied *from* |
+| `CATALOG_HOST` | unset — no `_redirects` written | hostname serving the catalog with the hash at the root |
+
+### The proxy rules
+
+A static host has no `/assets.json` or `/api/submit` to serve, so those paths
+404 on their own. Every rule is a `200` rewrite, not a redirect: the URL stays
+on the requested origin and the backend's CORS and cache headers pass through
+untouched. The rules live in two places, and the split is not cosmetic —
+**`netlify.toml` rules take precedence over `_redirects`**:
+
+| Declared in | Path | Applies on |
+|---|---|---|
+| `netlify.toml` | `/api/{submit,complete,auth/challenge}` | every domain |
+| `netlify.toml` | `/assets.json`, `/assets/<hash>/<file>` | every domain |
+| `dist/_redirects` | `/<hash>/<file>` | `CATALOG_HOST` only |
+| `dist/_redirects` | `/` → the catalog | `CATALOG_HOST` only |
 
 `<file>` is one of `info.json`, `logo.png`, `image.png` (a logo alias), or
 `banner.png`.
 
-The root-hash shape is scoped to `CATALOG_HOST` with an absolute `from` URL, so
-a bare `/<something>/logo.png` can never shadow a page on the main form site.
-Rules are first-match-wins and the host block is emitted first.
+`netlify.toml` can't express a rule scoped to a single hostname, which is the
+one thing the root-hash shape needs — so `scripts/build-static.ts` emits those
+to `dist/_redirects` with an absolute `from` URL. Scoping matters: an unscoped
+`/:hash/logo.png` would match any two-segment path and shadow future pages on
+the form site. The generated rules deliberately cover only paths `netlify.toml`
+leaves alone, so the precedence order never bites.
 
 **`CATALOG_HOST` must also be added to the Netlify site** under Domain
-management. Netlify only applies a domain-scoped rule for a domain assigned to
-the site; without that the requests never reach these rules at all.
+management. Netlify routes by `Host` header; a domain not assigned to the site
+gets Netlify's own 404 and no rule is consulted at all. DNS alone is not
+enough. If the domain sits behind Cloudflare, start DNS-only (grey cloud) —
+proxying blocks Netlify's certificate challenge.
 
-`CATALOG_BASE_URL` exists separately from `API_BASE_URL` for one reason:
-Netlify's proxy only handles ports 80 and 443, and the API URL carries `:4445`.
-`netlify.toml` points it at the same Phoenix app on 443 — the VPS `nginx` vhost
-exposes the catalog there deliberately, for exactly this. The browser still
-talks to `:4445` directly for `/api/*`, where no proxy is involved.
+`CATALOG_BASE_URL` is independent of `API_BASE_URL` because neither value
+`API_BASE_URL` takes is a usable rewrite target: it's `""` (same origin) on
+Netlify and carries `:4445` elsewhere, and Netlify's proxy only speaks ports
+80 and 443. The VPS `nginx` vhost exposes the catalog on 443 deliberately, for
+exactly this.
 
-The dev server doesn't apply `_redirects` — `npm run dev` serves `dist/` with
-esbuild, so `/assets.json` 404s locally. Read it from the backend origin
-directly when testing.
+The dev server applies neither file — `npm run dev` serves `dist/` with
+esbuild, so `/assets.json` and `/api/*` 404 locally. Dev builds with an unset
+`API_BASE_URL`, so the form still points at the absolute backend URL and
+submission works end to end; read the catalog from the backend origin directly.
 
 `public/js/wallet.js` reads that same absolute URL back off the form action, so
 the wallet challenge and the submission always target the same origin.
 
-**Cross-origin.** Netlify puts the frontend on a different origin from the API.
-Every request the frontend makes is CORS-simple (no custom headers), so no
-preflight is involved and no backend change is needed.
+**Same-origin in production.** Netlify proxies `/api/*` to the VPS, so the
+browser never makes a cross-origin request and CORS is not involved at all.
+Running without the proxy (dev, or a deploy with an absolute `API_BASE_URL`) is
+still cross-origin, but every request the frontend makes is CORS-simple — no
+custom headers, so no preflight and no backend change is needed.
 
 ## How a submission works
 
