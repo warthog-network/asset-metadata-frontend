@@ -83,18 +83,24 @@ untouched. The rules live in two places, and the split is not cosmetic —
 |---|---|---|
 | `netlify.toml` | `/api/{submit,complete,auth/challenge}` | every domain |
 | `netlify.toml` | `/assets.json`, `/assets/<hash>/<file>` | every domain |
-| `dist/_redirects` | `/<hash>/<file>` | `CATALOG_HOST` only |
+| `netlify.toml` | `/<hash>/<file>` — hash at the root | every domain |
 | `dist/_redirects` | `/` → the catalog | `CATALOG_HOST` only |
 
 `<file>` is one of `info.json`, `logo.png`, `image.png` (a logo alias), or
-`banner.png`.
+`banner.png`. Both shapes answer everywhere, so the catalog is reachable as
+`/assets/<hash>/logo.png` or `/<hash>/logo.png` on any domain the site serves.
 
-`netlify.toml` can't express a rule scoped to a single hostname, which is the
-one thing the root-hash shape needs — so `scripts/build-static.ts` emits those
-to `dist/_redirects` with an absolute `from` URL. Scoping matters: an unscoped
-`/:hash/logo.png` would match any two-segment path and shadow future pages on
-the form site. The generated rules deliberately cover only paths `netlify.toml`
-leaves alone, so the precedence order never bites.
+The root-hash shape being unscoped has a cost worth knowing: `/:hash/<file>`
+matches **any** single segment, so `/<anything>/info.json`, `/logo.png`,
+`/image.png` and `/banner.png` are reserved paths sitewide. That is harmless
+while this is one page with no router, but a future page must not use those
+two-segment shapes.
+
+Exactly one rule stays hostname-scoped, and `netlify.toml` cannot express it:
+on the catalog host a bare `/` should answer with the catalog rather than the
+submission form. Unscoping that would replace the form site's own homepage with
+JSON, so `scripts/build-static.ts` emits it to `dist/_redirects` with an
+absolute `from` URL instead.
 
 **`CATALOG_HOST` must also be added to the Netlify site** under Domain
 management. Netlify routes by `Host` header; a domain not assigned to the site

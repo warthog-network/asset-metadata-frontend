@@ -55,6 +55,33 @@
   to = "https://warthog-defitestnet.duckdns.org/assets/:splat"
   status = 200
 
+# The same four files addressed with the asset hash at the root, no /assets
+# prefix — assets.warthog.network/<hash>/logo.png. Unscoped, so they answer on
+# every domain this site serves, this one included. The cost is that
+# /<anything>/info.json, /logo.png, /image.png and /banner.png are now reserved
+# paths sitewide; harmless while this is a single page with no router, but a
+# future page must not use those two-segment shapes. Listed after /assets/*
+# so that more specific rule still wins.
+[[redirects]]
+  from = "/:hash/info.json"
+  to = "https://warthog-defitestnet.duckdns.org/assets/:hash/info.json"
+  status = 200
+
+[[redirects]]
+  from = "/:hash/logo.png"
+  to = "https://warthog-defitestnet.duckdns.org/assets/:hash/logo.png"
+  status = 200
+
+[[redirects]]
+  from = "/:hash/image.png"
+  to = "https://warthog-defitestnet.duckdns.org/assets/:hash/image.png"
+  status = 200
+
+[[redirects]]
+  from = "/:hash/banner.png"
+  to = "https://warthog-defitestnet.duckdns.org/assets/:hash/banner.png"
+  status = 200
+
 # Static assets are content-addressed by the build, so cache them hard and
 # keep the HTML itself always-revalidated.
 [[headers]]
