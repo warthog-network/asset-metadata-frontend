@@ -20,6 +20,7 @@ export function renderHome(apiUrl: string): string {
   <script defer src="/js/app.js"></script>
 </head>
 <body class="min-h-screen text-slate-50">
+  <!-- deploy-marker:probe-run-2 -->
   <main class="mx-auto max-w-xl px-4 py-16 sm:px-6 lg:px-8">
     <header class="mb-8 flex items-start gap-4">
       <img src="/images/warthog-mark.svg" width="48" height="48" alt="" class="mt-1 shrink-0" />
