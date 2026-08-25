@@ -13,7 +13,7 @@
 //   dist/images/warthog-mark.svg
 //   dist/_redirects       (only when CATALOG_HOST is set)
 
-import { mkdirSync, copyFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, copyFileSync, writeFileSync, rmSync } from "node:fs";
 import { renderHome } from "../src/page";
 
 // Where the Phoenix backend lives. Override per-deploy with the
@@ -64,6 +64,12 @@ copyFileSync("public/images/warthog-mark.svg", `${OUT}/images/warthog-mark.svg`)
 // Scoping it by absolute `from` keeps a bare two-segment path from shadowing
 // a page on the main form site. netlify.toml rules win over _redirects, so
 // these deliberately cover only paths it leaves alone.
+// Unset: drop any file a previous build left behind, so turning CATALOG_HOST
+// off actually takes effect instead of shipping a stale rule set.
+if (!CATALOG_HOST) {
+  rmSync(`${OUT}/_redirects`, { force: true });
+}
+
 if (CATALOG_HOST) {
   const catalogUrl = CATALOG_BASE_URL.replace(/\/$/, "");
   const files = ["info.json", "logo.png", "image.png", "banner.png"];
