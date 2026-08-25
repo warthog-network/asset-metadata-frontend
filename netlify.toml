@@ -15,12 +15,18 @@
   # browser never makes a cross-origin request. Set this to an absolute
   # origin only if you deploy the frontend without the proxy.
   API_BASE_URL = ""
-  # Public catalog hostname, added to this site under Domain management as a
-  # domain alias. It serves the same catalog with the asset hash at the root
-  # (assets.warthog.network/<hash>/logo.png). A rule scoped to one hostname
-  # can't be expressed here, so scripts/build-static.ts emits it to
-  # dist/_redirects; the rules above already cover this host's /assets/* too.
-  CATALOG_HOST = "assets.warthog.network"
+  # Public catalog hostname — the catalog with the asset hash at the root
+  # (assets.warthog.network/<hash>/logo.png). Setting this makes
+  # scripts/build-static.ts emit dist/_redirects with rules scoped to that
+  # hostname, which netlify.toml itself cannot express.
+  #
+  # Deliberately left unset until the domain is actually added to this site
+  # under Domain management. Netlify only honours a domain-scoped rule for a
+  # domain assigned to the site, so until then the rules are dead weight —
+  # and a rule set referencing an unassigned host is the current suspect for
+  # why NO redirect below is being applied. Turn it back on as the last step,
+  # after the Cloudflare CNAME and the Netlify domain alias both exist.
+  # CATALOG_HOST = "assets.warthog.network"
 
 # Proxy the Phoenix backend so the API is same-origin with the form.
 # status = 200 is a rewrite: the URL stays on this domain and Netlify
