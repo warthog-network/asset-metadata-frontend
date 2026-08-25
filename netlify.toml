@@ -28,6 +28,31 @@
   # after the Cloudflare CNAME and the Netlify domain alias both exist.
   # CATALOG_HOST = "assets.warthog.network"
 
+# ---- TEMPORARY DIAGNOSTIC PROBES — remove once the cause is found ----
+# No redirect rule below is taking effect on the deployed site, while the
+# [[headers]] rules in this same file do. These three split the cause:
+#   /probe-local    works => the redirect engine runs at all
+#   /probe-external works => outbound proxying works, to a known-good host
+#   /probe-vps      works => the VPS is reachable from Netlify's edge
+[[redirects]]
+  from = "/probe-local"
+  to = "/index.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/probe-external"
+  to = "https://example.com/"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/probe-vps"
+  to = "https://warthog-defitestnet.duckdns.org/assets.json"
+  status = 200
+  force = true
+# ---- END TEMPORARY PROBES ----
+
 # Proxy the Phoenix backend so the API is same-origin with the form.
 # status = 200 is a rewrite: the URL stays on this domain and Netlify
 # fetches from the VPS. Target is port 443, not :4445 — Netlify's proxy is
