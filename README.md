@@ -13,9 +13,15 @@ builds to static files and deploys to Netlify.
 browser (Netlify)                          VPS (Phoenix + Postgres)
   index.html + app.js  ──── POST /api/submit ─────────►  publish to catalog
                        ──── GET  /api/auth/challenge ─►  one-time nonce
-                       ──── GET  /assets/<hash>/... ──►  serve metadata
+  /assets.json         ──── proxied by Netlify ───────►  the public catalog
+  /assets/<hash>/...   ──── proxied by Netlify ───────►  serve metadata
   autocomplete         ──── GET  /asset/complete ─────►  Warthog node (direct)
 ```
+
+The API calls go straight to the VPS cross-origin. The catalog is the
+exception: wallets and explorers expect it on an origin of their own, so
+`dist/_redirects` rewrites it through to the backend — both on this site and on
+`assets.warthog.network`, where the hash sits at the root (see **Deploy**).
 
 ## Quick start
 
@@ -56,6 +62,45 @@ the request host, so the URL is baked into the form's `action`:
 | Build env var | Default |
 |---|---|
 | `API_BASE_URL` | `https://warthog-defitestnet.duckdns.org:4445` |
+| `CATALOG_BASE_URL` | falls back to `API_BASE_URL` |
+| `CATALOG_HOST` | unset (no host-scoped rules) |
+
+### The catalog proxy
+
+A static host has no `/assets.json` to serve, so the path 404s on its own. The
+build writes `dist/_redirects` with `200!` rewrites — a rewrite, not a
+redirect, so the URL stays on the requested origin and the backend's CORS and
+cache headers pass through untouched.
+
+Two path shapes are served:
+
+| Where | Path | Proxied to |
+|---|---|---|
+| every domain | `/assets.json` | `<CATALOG_BASE_URL>/assets.json` |
+| every domain | `/assets/<hash>/<file>` | the same path upstream |
+| `CATALOG_HOST` only | `/<hash>/<file>` | `/assets/<hash>/<file>` upstream |
+| `CATALOG_HOST` only | `/` | `/assets.json` — a data host answers with the catalog, not the form |
+
+`<file>` is one of `info.json`, `logo.png`, `image.png` (a logo alias), or
+`banner.png`.
+
+The root-hash shape is scoped to `CATALOG_HOST` with an absolute `from` URL, so
+a bare `/<something>/logo.png` can never shadow a page on the main form site.
+Rules are first-match-wins and the host block is emitted first.
+
+**`CATALOG_HOST` must also be added to the Netlify site** under Domain
+management. Netlify only applies a domain-scoped rule for a domain assigned to
+the site; without that the requests never reach these rules at all.
+
+`CATALOG_BASE_URL` exists separately from `API_BASE_URL` for one reason:
+Netlify's proxy only handles ports 80 and 443, and the API URL carries `:4445`.
+`netlify.toml` points it at the same Phoenix app on 443 — the VPS `nginx` vhost
+exposes the catalog there deliberately, for exactly this. The browser still
+talks to `:4445` directly for `/api/*`, where no proxy is involved.
+
+The dev server doesn't apply `_redirects` — `npm run dev` serves `dist/` with
+esbuild, so `/assets.json` 404s locally. Read it from the backend origin
+directly when testing.
 
 `public/js/wallet.js` reads that same absolute URL back off the form action, so
 the wallet challenge and the submission always target the same origin.
@@ -132,7 +177,9 @@ and the asset, so a signature cannot be replayed against another token.
 
 ### `GET /assets.json`, `GET /assets/<hash>/{info.json,logo.png,banner.png}`
 
-The public catalog. Open CORS so wallets and explorers can read it.
+The public catalog. Open CORS so wallets and explorers can read it. Netlify
+rewrites both paths through to the backend, so they answer on the frontend
+origin too — see **The catalog proxy**.
 
 ## Layout
 

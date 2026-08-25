@@ -50,13 +50,17 @@ export function renderHome(apiUrl: string): string {
           Warthog node
         </label>
         <div class="relative mt-1">
+          <!-- min-w-0 on the input is load-bearing: a bare flex item won't
+               shrink below its intrinsic width, and an <input> carries a
+               ~20ch one, which pushed the shrink-0 button off-screen on
+               narrow phones. -->
           <div class="flex gap-2">
             <input
               id="f-node-input"
               type="url"
               name="warthog_node"
               placeholder="https://warthog-defitestnet.duckdns.org/"
-              class="grow rounded-md border border-white/10 bg-black/30 px-3 py-2 font-mono text-sm text-slate-100 outline-none transition focus:border-[#FDB913] focus:ring-2 focus:ring-[#FDB913]/30"
+              class="min-w-0 grow rounded-md border border-white/10 bg-black/30 px-3 py-2 font-mono text-sm text-slate-100 outline-none transition focus:border-[#FDB913] focus:ring-2 focus:ring-[#FDB913]/30"
             />
             <button
               id="f-node-button"
