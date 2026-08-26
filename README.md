@@ -29,6 +29,12 @@ Nothing the browser calls is cross-origin in production: Netlify rewrites
 (see **Deploy**). The catalog additionally answers on `testnet-assets.warthog.network`,
 where the asset hash sits at the root instead of under `/assets/`.
 
+## API
+
+For programmatic submission of asset metadata, see [docs/api.md](docs/api.md).
+The detailed request/response shapes and `/api/*` envelope codes are documented
+below in **Backend contract**.
+
 ## Quick start
 
 ```sh
