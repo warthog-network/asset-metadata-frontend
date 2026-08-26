@@ -16,14 +16,14 @@
   # origin only if you deploy the frontend without the proxy.
   API_BASE_URL = ""
   # Public catalog hostname — the catalog with the asset hash at the root
-  # (assets.warthog.network/<hash>/logo.png). Setting this makes
+  # (testnet-assets.warthog.network/<hash>/logo.png). Setting this makes
   # scripts/build-static.ts emit dist/_redirects with rules scoped to that
   # hostname, which netlify.toml itself cannot express.
   #
   # Inert until the domain is added to this site under Domain management:
   # Netlify only honours a domain-scoped rule for an assigned domain. Harmless
   # until then — the rules simply never match.
-  CATALOG_HOST = "assets.warthog.network"
+  CATALOG_HOST = "testnet-assets.warthog.network"
 
 # Proxy the Phoenix backend so the API is same-origin with the form.
 # status = 200 is a rewrite: the URL stays on this domain and Netlify
@@ -56,7 +56,7 @@
   status = 200
 
 # The same four files addressed with the asset hash at the root, no /assets
-# prefix — assets.warthog.network/<hash>/logo.png. Unscoped, so they answer on
+# prefix — testnet-assets.warthog.network/<hash>/logo.png. Unscoped, so they answer on
 # every domain this site serves, this one included. The cost is that
 # /<anything>/info.json, /logo.png, /image.png and /banner.png are now reserved
 # paths sitewide; harmless while this is a single page with no router, but a

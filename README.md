@@ -4,6 +4,8 @@ The submission form for Warthog asset metadata. A single static page: unlock a
 Warthog wallet in the browser, fill in the asset's metadata, attach a logo and
 optional banner, and publish.
 
+**Website:** <https://testnet-assets.warthog.network/>
+
 **This repo is frontend-only.** It has no server and no database. The API and
 all stored data belong to the Elixir/Phoenix service on the VPS, which owns
 submission, the wallet challenge, and the published asset catalog. This repo
@@ -18,13 +20,13 @@ browser                     Netlify edge              VPS (Phoenix + Postgres)
   GET  /assets/<hash>/… ──── rewrite ────────────────►  serve metadata
   autocomplete ─────────────────────────────────────►  Warthog node (direct)
 
-assets.warthog.network
+testnet-assets.warthog.network
   GET  /<hash>/…        ──── rewrite ────────────────►  /assets/<hash>/…
 ```
 
 Nothing the browser calls is cross-origin in production: Netlify rewrites
 `/api/*` and the catalog through to the VPS, so the page emits relative URLs
-(see **Deploy**). The catalog additionally answers on `assets.warthog.network`,
+(see **Deploy**). The catalog additionally answers on `testnet-assets.warthog.network`,
 where the asset hash sits at the root instead of under `/assets/`.
 
 ## Quick start
