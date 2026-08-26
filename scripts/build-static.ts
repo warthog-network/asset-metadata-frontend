@@ -11,6 +11,8 @@
 //   dist/css/app.css
 //   dist/js/app.js
 //   dist/images/warthog-mark.svg
+//   dist/images/favicon.svg
+//   dist/images/favicon.png
 //   dist/_redirects       (only when CATALOG_HOST is set)
 
 import { mkdirSync, copyFileSync, writeFileSync, rmSync } from "node:fs";
@@ -53,6 +55,8 @@ mkdirSync(`${OUT}/images`, { recursive: true });
 
 writeFileSync(`${OUT}/index.html`, renderHome(apiUrl));
 copyFileSync("public/images/warthog-mark.svg", `${OUT}/images/warthog-mark.svg`);
+copyFileSync("public/images/favicon.svg", `${OUT}/images/favicon.svg`);
+copyFileSync("public/images/favicon.png", `${OUT}/images/favicon.png`);
 
 // Unset: drop any file a previous build left behind, so turning CATALOG_HOST
 // off actually takes effect instead of shipping a stale rule set.
