@@ -35,9 +35,11 @@ const API_BASE_URL =
 const CATALOG_BASE_URL =
   process.env.CATALOG_BASE_URL || "https://warthog-defitestnet.duckdns.org";
 
-// Public catalog hostname, added to the Netlify site as a domain alias, where
-// the asset hash sits at the root: testnet-assets.warthog.network/<hash>/logo.png.
-// Unset and no _redirects file is written at all.
+// Hostname of a data-only catalog host, added to the Netlify site as a domain
+// alias, whose bare / answers with the catalog instead of the submission form.
+// Unset and no _redirects file is written at all — which is the production
+// case, where the catalog and the website share one host. Never name a host
+// that serves the form here; see the note in netlify.toml.
 const CATALOG_HOST = process.env.CATALOG_HOST || "";
 
 const OUT = "dist";

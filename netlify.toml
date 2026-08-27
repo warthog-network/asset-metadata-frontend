@@ -15,15 +15,21 @@
   # browser never makes a cross-origin request. Set this to an absolute
   # origin only if you deploy the frontend without the proxy.
   API_BASE_URL = ""
-  # Public catalog hostname — the catalog with the asset hash at the root
-  # (testnet-assets.warthog.network/<hash>/logo.png). Setting this makes
-  # scripts/build-static.ts emit dist/_redirects with rules scoped to that
-  # hostname, which netlify.toml itself cannot express.
+  # Hostname of a DATA-ONLY catalog host: one whose bare / answers with
+  # assets.json instead of the submission form. Setting this makes
+  # scripts/build-static.ts emit dist/_redirects with a root rule scoped to
+  # that hostname, which netlify.toml itself cannot express.
   #
-  # Inert until the domain is added to this site under Domain management:
-  # Netlify only honours a domain-scoped rule for an assigned domain. Harmless
-  # until then — the rules simply never match.
-  CATALOG_HOST = "testnet-assets.warthog.network"
+  # MUST NOT name a host that serves the form. The generated rule is a forced
+  # rewrite (200!), so it outranks dist/index.html and that host's homepage
+  # becomes raw JSON. That is exactly what setting this to
+  # testnet-assets.warthog.network did — the site's own website domain.
+  #
+  # Empty because the website and the catalog are now one host. Nothing is lost
+  # by that: every catalog rule below is unscoped and answers sitewide,
+  # including the root-hash shape (/<hash>/logo.png). Only the bare / differs,
+  # and there it has to be the form.
+  CATALOG_HOST = ""
 
 # Proxy the Phoenix backend so the API is same-origin with the form.
 # status = 200 is a rewrite: the URL stays on this domain and Netlify

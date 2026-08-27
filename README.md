@@ -18,16 +18,15 @@ browser                     Netlify edge              VPS (Phoenix + Postgres)
   GET  /api/auth/challenge ─ rewrite ────────────────►  one-time nonce
   GET  /assets.json     ──── rewrite ────────────────►  the public catalog
   GET  /assets/<hash>/… ──── rewrite ────────────────►  serve metadata
-  autocomplete ─────────────────────────────────────►  Warthog node (direct)
-
-testnet-assets.warthog.network
   GET  /<hash>/…        ──── rewrite ────────────────►  /assets/<hash>/…
+  autocomplete ─────────────────────────────────────►  Warthog node (direct)
 ```
 
 Nothing the browser calls is cross-origin in production: Netlify rewrites
 `/api/*` and the catalog through to the VPS, so the page emits relative URLs
-(see **Deploy**). The catalog additionally answers on `testnet-assets.warthog.network`,
-where the asset hash sits at the root instead of under `/assets/`.
+(see **Deploy**). The website and the catalog share one host: `/` is the
+submission form, and the catalog answers under it — with the asset hash at the
+root (`/<hash>/logo.png`) as well as under `/assets/`.
 
 ## API
 
@@ -77,7 +76,7 @@ the request host, so the URL is baked into the form's `action`:
 |---|---|---|
 | `API_BASE_URL` | `https://warthog-defitestnet.duckdns.org:4445` | baked into the form `action`; `""` on Netlify means same-origin |
 | `CATALOG_BASE_URL` | `https://warthog-defitestnet.duckdns.org` | origin the catalog is proxied *from* |
-| `CATALOG_HOST` | unset — no `_redirects` written | hostname serving the catalog with the hash at the root |
+| `CATALOG_HOST` | unset — no `_redirects` written | a data-only host whose bare `/` is the catalog, not the form |
 
 ### The proxy rules
 
@@ -92,7 +91,7 @@ untouched. The rules live in two places, and the split is not cosmetic —
 | `netlify.toml` | `/api/{submit,complete,auth/challenge}` | every domain |
 | `netlify.toml` | `/assets.json`, `/assets/<hash>/<file>` | every domain |
 | `netlify.toml` | `/<hash>/<file>` — hash at the root | every domain |
-| `dist/_redirects` | `/` → the catalog | `CATALOG_HOST` only |
+| `dist/_redirects` | `/` → the catalog | `CATALOG_HOST` only — unset in production |
 
 `<file>` is one of `info.json`, `logo.png`, `image.png` (a logo alias), or
 `banner.png`. Both shapes answer everywhere, so the catalog is reachable as
@@ -104,17 +103,23 @@ matches **any** single segment, so `/<anything>/info.json`, `/logo.png`,
 while this is one page with no router, but a future page must not use those
 two-segment shapes.
 
-Exactly one rule stays hostname-scoped, and `netlify.toml` cannot express it:
-on the catalog host a bare `/` should answer with the catalog rather than the
-submission form. Unscoping that would replace the form site's own homepage with
-JSON, so `scripts/build-static.ts` emits it to `dist/_redirects` with an
-absolute `from` URL instead.
+One rule can be hostname-scoped, and `netlify.toml` cannot express it: a
+data-only host where a bare `/` answers with the catalog rather than the
+submission form. `scripts/build-static.ts` emits that to `dist/_redirects` with
+an absolute `from` URL, and only when `CATALOG_HOST` names such a host.
 
-**`CATALOG_HOST` must also be added to the Netlify site** under Domain
-management. Netlify routes by `Host` header; a domain not assigned to the site
-gets Netlify's own 404 and no rule is consulted at all. DNS alone is not
-enough. If the domain sits behind Cloudflare, start DNS-only (grey cloud) —
-proxying blocks Netlify's certificate challenge.
+**`CATALOG_HOST` is unset, and must stay unset while the catalog shares a host
+with the website.** The generated rule is a forced rewrite (`200!`), so it
+outranks `dist/index.html`: point it at the host that serves the form and that
+homepage becomes raw JSON. Nothing is lost by leaving it unset — every rule in
+the table above is sitewide, so the whole catalog, root-hash shape included,
+still answers on this domain. Only `/` differs, and there it must be the form.
+
+Set it only for a genuinely separate data host, and **add that host to the
+Netlify site** under Domain management. Netlify routes by `Host` header; a
+domain not assigned to the site gets Netlify's own 404 and no rule is consulted
+at all. DNS alone is not enough. If the domain sits behind Cloudflare, start
+DNS-only (grey cloud) — proxying blocks Netlify's certificate challenge.
 
 `CATALOG_BASE_URL` is independent of `API_BASE_URL` because neither value
 `API_BASE_URL` takes is a usable rewrite target: it's `""` (same origin) on
