@@ -25,7 +25,10 @@ the README under **Backend contract**.
 ## Programmatic submission flow
 
 Submission is wallet-authenticated — only the asset's on-chain creator
-can publish its metadata. Anyone else gets `403 not_owner`.
+can publish its metadata. Anyone else gets `403 not_owner`. Each asset
+may be published or updated at most once every 24 hours; a second
+`POST /api/submit` for the same hash inside that window returns
+`429 too_soon`.
 
 1. **GET the challenge.**
 
@@ -49,7 +52,9 @@ can publish its metadata. Anyone else gets `403 not_owner`.
    - [`warthog-ts`](https://www.npmjs.com/package/warthog-ts) —
      `account.signBytes(message).signature`
    - [`warthog_ex`](https://github.com/warthog-network/warthog_ex) —
-     `WarthogEx.Account.sign_bytes(account, message)` (4th tuple element)
+     `WarthogEx.Account.sign_bytes(account, message)` (4th tuple element).
+     The Phoenix backend recovers the signer with
+     `WarthogEx.Account.recover_address/2` (same SDK).
    - [`warthog_py`](https://github.com/warthog-network/warthog_py) —
      `account.sign_bytes(message)` (4th tuple element)
 

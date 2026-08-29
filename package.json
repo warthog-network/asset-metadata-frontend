@@ -1,5 +1,5 @@
 {
-  "name": "asset-metadata-js",
+  "name": "asset-metadata-frontend",
   "version": "0.1.0",
   "description": "Warthog Asset Metadata — static frontend",
   "type": "module",

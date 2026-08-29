@@ -233,8 +233,15 @@ Error (4xx/5xx):
 reworded. Known codes: `invalid_hash`, `invalid_name`, `invalid_description`,
 `invalid_url`, `invalid_image`, `wrong_dimensions`, `logo_required`,
 `asset_not_found`, `not_owner`, `bad_signature`, `challenge_required`,
-`challenge_expired`, `node_unreachable`, `node_error`, `catalog_error`,
-`missing_param`, `not_found`, `unprocessable`.
+`challenge_expired`, `too_soon`, `node_unreachable`, `node_error`,
+`catalog_error`, `missing_param`, `not_found`, `unprocessable`.
+
+A successful publish (or update) of an asset starts a rolling 24-hour
+window: the next `POST /api/submit` for that same hash returns `429 too_soon`
+until the window elapses. The one-time challenge already blocks replay of a
+single signed request; the window stops a creator from flooding the catalog
+with a fresh challenge each time. Override with `RESUBMIT_INTERVAL_SECONDS`
+on the backend.
 
 The server re-validates everything the browser checked — never trust the client.
 

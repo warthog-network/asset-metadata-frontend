@@ -35,9 +35,9 @@ export function renderHome(apiUrl: string): string {
 
     <section class="rounded-xl border border-white/10 bg-[rgba(8,12,24,0.75)] p-6 shadow-[0_15px_30px_rgba(2,6,14,0.65)] sm:p-8">
       <p class="mt-0 text-base leading-6 text-slate-300">
-        Add or update the public metadata for a Warthog asset to
-        <code class="font-mono text-[0.92em] text-slate-200">warthog-network/public-data</code>
-        (plus optional logo and banner) via a pull request.
+        Add or update the public metadata for a Warthog asset (name, description,
+        links, logo, optional banner). Only the on-chain creator can publish, and
+        each asset can be updated at most once every 24 hours.
       </p>
 
       <div class="mt-5 rounded-lg border border-white/10 bg-black/30 px-4 py-3">
